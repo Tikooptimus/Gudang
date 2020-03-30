@@ -1,0 +1,97 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Http\Request;
+use App\Produk;
+
+class ProdukController extends Controller
+{
+    public function daftar(Request $req)
+    {
+        // Menghubungkan Tabel Produk dengan Kategori
+        $data = Produk::join('kategori','kategori.id','produk.id_kategori')
+                ->where('nama_produk','like',"%{$req->keyword}%")
+                ->select('produk.*','nama_kategori')
+                ->orderBy('updated_at','desc')
+                ->paginate(10);
+
+        return view('admin.pages.produk.daftar',['data'=>$data]);
+    }
+
+    //Fungsi Tambah
+    public function add()
+    {
+        return view('admin.pages.produk.add');
+    }
+
+    //Fungsi Simpan
+    public function save(Request $req)
+    {
+        \Validator::make($req->all(),[
+            'kode' => 'required|between:3,100|unique:produk,kode_produk',
+            'nama_produk' => 'required|between:3,100',
+            'kategori' => 'required|numeric',
+            'harga' => 'required|numeric',
+            'stok' => 'required|numeric',
+            'gambar' => 'nullable|image',
+        ])->validate();
+
+        $filename = null;
+
+        if ($req->hasFile('gambar')) {
+            // Ganti nama file
+            $filename = rand(1,999).'_'.str_replace(' ', '', $req->gambar->getClientOriginalName());
+
+            // Simpan file ke storage->app->public
+            $req->file('gambar')->storeAs('public/gambar-produk',$filename);
+
+        }
+        
+        $result = new Produk;
+        $result->kode_produk = $req->kode;
+        $result->nama_produk = $req->nama_produk;
+        $result->id_kategori = $req->kategori;
+        $result->harga = $req->harga;
+        $result->stok = $req->stok;
+        $result->gambar_produk = $filename;
+
+        if ($result->save()) {
+            return redirect()->route('admin.produk')->with('result','success');
+        } else {
+            return back()->with('result','fail')->withInput();
+        }
+    }
+
+    public function edit($id)
+    {
+        // $data = Produk::find($id);
+        $data = Produk::where('id',$id)->first();
+        return view('admin.pages.produk.edit',['rc'=>$data]);
+    }
+
+    public function update(Request $req)
+    {
+        \Validator::make($req->all(),[
+            'kode' => 'required|between:3,100|unique:produk,kode_produk',
+            'nama_produk' => 'required|between:3,100',
+            'kategori' => 'required|numeric',
+            'harga' => 'required|numeric',
+            'stok' => 'required|numeric',
+        ])->validate();
+
+        $result = Produk::where('id',$req->id)
+                    ->update([
+                        'id_kategori' => $req->kategori,
+                        'kode_produk' => $req->kode,
+                        'nama_produk' => $req->nama_produk,
+                        'harga' => $req->harga,
+                        'stok' => $req->stok,
+                    ]);
+        if ($result) {
+            return redirect()->route('admin.produk')->with('result','update');
+        } else {
+            return back()->with('result','fail');
+        }
+    }
+}
